@@ -6,6 +6,7 @@ describe('Example', () => {
     let aliceAccount = accounts[3];
     let deployer;
     let limeFactoryInstance;
+    const a = 3;
 
     before(async () => {
         deployer = new etherlime.EtherlimeGanacheDeployer(aliceAccount.secretKey);
