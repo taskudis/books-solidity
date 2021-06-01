@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
+pragma experimental ABIEncoderV2;
 pragma solidity >=0.7.0;
-pragma abicoder v2;
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract BookLibrary is Ownable {
@@ -16,6 +17,27 @@ contract BookLibrary is Ownable {
 
   Book[] public booksStored;
   mapping (string => Book) private books;
+
+function getAvailableBooks() public view returns (Book[] memory) {
+    // Count the available booksCoun
+    uint8 availableBooksCount = 0;
+    for (uint8 i = 0; i < booksCount; i++) {
+        if (booksStored[i].count != 0) {
+            availableBooksCount++;
+        }
+    }
+
+    Book[] memory dynamicMemoryArray = new Book[](availableBooksCount);
+    uint8 counter = 0;
+    for (uint8 i = 0; i < booksCount; i++) {
+        if (booksStored[i].count != 0) {
+            dynamicMemoryArray[counter] = booksStored[i];
+            counter++;
+        }
+    }
+
+    return dynamicMemoryArray;
+}
 
   function getStoredBooks () public view returns (Book[] memory) {
       return booksStored;
@@ -76,4 +98,9 @@ contract BookLibrary is Ownable {
 
       return books[id].borrowers;
   }
+
+    function isAvailable(string memory id) public view returns (bool) {
+    bool available = books[id].count != 0;
+    return available;
+    }
 }
