@@ -4,7 +4,7 @@ const BookLibrary = require('./build/BookLibrary.json');
 const run = async function() {
 	const provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
     const wallet = new ethers.Wallet("0x7ab741b57e8d94dd7e1a29055646bafde7010f38a900f55bbd7647880faa6ee8", provider);
-	const bookLibContract = new ethers.Contract("0xc9707E1e496C12f1Fa83AFbbA8735DA697cdBf64", BookLibrary.abi, wallet);
+	const bookLibContract = new ethers.Contract("0x0116090EfeC8A6c176A094d3094c58811a7eA39c", BookLibrary.abi, wallet);
 
 	// 1. Add Book
 	const addBookTransaction = await bookLibContract.addBook('Lord', 1);

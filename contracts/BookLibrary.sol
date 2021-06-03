@@ -17,6 +17,9 @@ contract BookLibrary is Ownable {
 
   Book[] public booksStored;
   mapping (string => Book) private books;
+  event BookAdded(string name);
+  event BookBorrowed(string name);
+  event BookReturned(string name);
 
 function getAvailableBooks() public view returns (Book[] memory) {
     // Count the available booksCoun
@@ -65,6 +68,7 @@ function getAvailableBooks() public view returns (Book[] memory) {
       }
 
       booksCount += 1;
+      emit BookAdded(id);
   }
 
   function borrowBook(string memory id) public {
@@ -80,6 +84,7 @@ function getAvailableBooks() public view returns (Book[] memory) {
               booksStored[i].count = books[id].count;
           }
       }
+      emit BookBorrowed(id);
   }
 
   function returnBook(string memory id, uint8 count) public {
@@ -91,6 +96,7 @@ function getAvailableBooks() public view returns (Book[] memory) {
               booksStored[i].count = books[id].count;
           }
       }
+      emit BookReturned(id);
   }
 
   function getBorrowers(string memory id) public view returns (address[] memory) {

@@ -4,7 +4,7 @@ const BookLibrary = require('./build/BookLibrary.json');
 const run = async function() {
 	const provider = new ethers.providers.InfuraProvider("ropsten", "40c2813049e44ec79cb4d7e0d18de173");
     const wallet = new ethers.Wallet("cb44501c75a77824a48a5b0a273ab4898dec507a5a901ca1d0dbe1f1cc4049d5", provider);
-	const bookLibContract = new ethers.Contract("0x7f916Df9e0Eb97DC5fFbAf6fF2AD7635aB7b987a", BookLibrary.abi, wallet);
+	const bookLibContract = new ethers.Contract("0x9662496e354849EeB5195512725925a448d06571", BookLibrary.abi, wallet);
 
 	// 1. Add Book
 	const addBookTransaction = await bookLibContract.addBook('Lord', 1);
