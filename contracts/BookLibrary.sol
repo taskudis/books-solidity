@@ -5,9 +5,10 @@ pragma solidity >=0.7.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./LIBWrapper.sol";
+import "./LIB.sol";
 
 contract BookLibrary is Ownable {
-  IERC20 public LIBToken;
+  LIB public LIBToken;
   LIBWrapper public LIBWrapperContract;
 
   address payable public wrapperAddress;
@@ -17,13 +18,14 @@ contract BookLibrary is Ownable {
       string id;
       uint8 count;
       bool exists;
-      address[] borrowers;
+      address[] borrowers; // 
+      mapping (string => bool) pesho; // use mapping
   }
 
   uint256 booksCount = 0;
 
   Book[] public booksStored;
-  mapping (string => Book) private books;
+  mapping (string => Book) private books; // Refactor use hash
   mapping (address => mapping (string => bool)) private userBooks;
 
   // Events
@@ -32,13 +34,14 @@ contract BookLibrary is Ownable {
   event BookReturned(string name);
 
   constructor(address LIBTokenAddress, address payable LIBWrapperAddress) public {
-    LIBToken = IERC20(LIBTokenAddress);
+    LIBToken = LIB(LIBTokenAddress);
     LIBWrapperContract = LIBWrapper(LIBWrapperAddress);
     wrapperAddress = LIBWrapperAddress;
   }
 
   // Getters
   function getAvailableBooks() public view returns (Book[] memory) {
+    // no for loops
     require(booksCount != 0, "There are no saved books");
     // Count the available booksCount
     uint8 availableBooksCount = 0;
@@ -127,6 +130,36 @@ contract BookLibrary is Ownable {
       // Add the book to the userBooks mapping
       userBooks[msg.sender][id] = true;
       emit BookBorrowed(id);
+  }
+
+  function borrowBookBySignature(string memory id, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public {
+    require(books[id].exists, "Sorry the book doesn't exists yet !");
+    require(books[id].count != 0, "Sorry there is not enough count of the book !");
+    require(!userBooks[msg.sender][id], "Sorry the user has already borrowed one copy of the book");
+
+    uint nonce = LIBToken.nonces(msg.sender);
+    require( LIBToken.checkPermit(msg.sender, address(this), value, deadline, v,r,s, nonce) == msg.sender, "The permit verification failed !");
+
+    LIBToken.permit(msg.sender, address(this), value, deadline, v,r,s);
+		LIBToken.transferFrom(msg.sender, address(this), rent);
+
+    // Update books mapping
+    books[id].count -= 1;
+    books[id].borrowers.push(msg.sender);
+
+    // Update the booksStored array
+    for (uint256 i = 0; i < booksStored.length; i++) {
+        if (keccak256(abi.encodePacked((booksStored[i].id))) == keccak256(abi.encodePacked((id)))) {
+            // Get the storage pointer of the Book
+            Book storage currentBook = booksStored[i];
+            currentBook.count = books[id].count;
+            currentBook.borrowers = books[id].borrowers;
+        }
+    }
+
+    // Add the book to the userBooks mapping
+    userBooks[msg.sender][id] = true;
+    emit BookBorrowed(id);
   }
 
   function withdrawLibraryAmount() public onlyOwner {
