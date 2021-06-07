@@ -4,7 +4,7 @@ pragma abicoder v2;
 
 import "@openzeppelin/contracts/presets/ERC20PresetMinterPauser.sol";
 
-contract WETH is ERC20PresetMinterPauser {
+contract LIB is ERC20PresetMinterPauser {
 
 	constructor() ERC20PresetMinterPauser("Library Token", "LIB") {
 
