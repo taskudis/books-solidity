@@ -18,15 +18,12 @@ contract BookLibrary is Ownable {
       string id;
       uint8 count;
       bool exists;
-      address[] borrowers; // 
-      mapping (string => bool) pesho; // use mapping
+      address[] borrowers;
   }
 
-  uint256 booksCount = 0;
-
-  Book[] public booksStored;
-  mapping (string => Book) private books; // Refactor use hash
-  mapping (address => mapping (string => bool)) private userBooks;
+  string[] public booksStored;
+  mapping (bytes32 => Book) private books;
+  mapping (bytes32 => mapping (address => bool)) private userBooks; // turn it book > user > bool
 
   // Events
   event BookAdded(string name);
@@ -40,126 +37,67 @@ contract BookLibrary is Ownable {
   }
 
   // Getters
-  function getAvailableBooks() public view returns (Book[] memory) {
-    // no for loops
-    require(booksCount != 0, "There are no saved books");
-    // Count the available booksCount
-    uint8 availableBooksCount = 0;
-    for (uint8 i = 0; i < booksCount; i++) {
-        if (booksStored[i].count != 0) {
-            availableBooksCount++;
-        }
-    }
-
-    // Create dynamic memory array
-    Book[] memory dynamicMemoryArray = new Book[](availableBooksCount);
-    uint8 counter = 0;
-    for (uint8 i = 0; i < booksCount; i++) {
-        if (booksStored[i].count != 0) {
-            dynamicMemoryArray[counter] = booksStored[i];
-            counter++;
-        }
-    }
-
-    return dynamicMemoryArray;
-  }
-
-  function getStoredBooks () public view returns (Book[] memory) {
+  function getStoredBooks () public view returns (string[] memory) {
       return booksStored;
   }
 
-  function getBorrowers(string memory id) public view returns (address[] memory) {
-      require(books[id].exists, "The requested book doesn't exists !");
-      return books[id].borrowers;
+  function getBorrowers(string memory _id) public view returns (address[] memory) {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
+    require(books[bookHash].exists, "The requested book doesn't exists !");
+    return books[bookHash].borrowers;
   }
-
   // Interactions
-  function addBook(string memory id, uint8 count) public onlyOwner {
-    bool exists = books[id].exists;
+  function addBook(string memory _id, uint8 _count) public onlyOwner {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
+    bool exists = books[bookHash].exists;
 
-    // If the book is not present in the mapping
     if (!exists) {
-      // Create new book
       address[] memory borrowers;
-      Book memory newBook = Book({ id: id, count: count, exists: true, borrowers: borrowers });
+      Book memory newBook = Book({ id: _id, count: _count, exists: true, borrowers: borrowers });
 
-      booksStored.push(newBook);
-      books[id] = newBook;
-      booksCount += 1;
+      booksStored.push(_id);
+      books[bookHash] = newBook;
     } else {
-      // The book is present
-      books[id].count += 1;
-
-      // Update the booksStored array
-      for (uint256 i = 0; i < booksStored.length; i++) {
-        if (keccak256(abi.encodePacked((booksStored[i].id))) == keccak256(abi.encodePacked((id)))) {
-            Book storage currentBook = booksStored[i];
-            currentBook.count = books[id].count;
-        }
-      }
+      books[bookHash].count += 1;
     }
 
-    emit BookAdded(id);
+    emit BookAdded(_id);
   }
 
-  function borrowBook(string memory id) public {
-      require(books[id].exists, "Sorry the book doesn't exists yet !");
-      require(books[id].count != 0, "Sorry there is not enough count of the book !");
-      require(!userBooks[msg.sender][id], "Sorry the user has already borrowed one copy of the book");
+  function borrowBook(string memory _id) public {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
 
-      // The user must have allowance
-      require(LIBToken.allowance(msg.sender, address(this)) >= rent, "Not enough LIB Token allowance !");
-      require(LIBToken.balanceOf(msg.sender) > 0, "User balance is not enough to rent the book !");
+    require(books[bookHash].exists, "Sorry the book doesn't exists yet !");
+    require(books[bookHash].count != 0, "Sorry there is not enough counts of the book !");
+    require(!userBooks[bookHash][msg.sender], "Sorry the user has already borrowed one copy of the book");
 
-      LIBToken.transferFrom(msg.sender, address(this), rent);
+    LIBToken.transferFrom(msg.sender, address(this), rent);
 
-      // Update books mapping
-      books[id].count -= 1;
-      books[id].borrowers.push(msg.sender);
+    books[bookHash].count -= 1;
+    books[bookHash].borrowers.push(msg.sender);
 
-      // Update the booksStored array
-      for (uint256 i = 0; i < booksStored.length; i++) {
-          if (keccak256(abi.encodePacked((booksStored[i].id))) == keccak256(abi.encodePacked((id)))) {
-              // Get the storage pointer of the Book
-              Book storage currentBook = booksStored[i];
-              currentBook.count = books[id].count;
-              currentBook.borrowers = books[id].borrowers;
-          }
-      }
-
-      // Add the book to the userBooks mapping
-      userBooks[msg.sender][id] = true;
-      emit BookBorrowed(id);
+    userBooks[bookHash][msg.sender] = true;
+    emit BookBorrowed(_id);
   }
 
-  function borrowBookBySignature(string memory id, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public {
-    require(books[id].exists, "Sorry the book doesn't exists yet !");
-    require(books[id].count != 0, "Sorry there is not enough count of the book !");
-    require(!userBooks[msg.sender][id], "Sorry the user has already borrowed one copy of the book");
+  function borrowBookBySignature(string memory _id, uint256 _value, uint256 _deadline, uint8 _v, bytes32 _r, bytes32 _s) public {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
+
+    require(books[bookHash].exists, "Sorry the book doesn't exists yet !");
+    require(books[bookHash].count != 0, "Sorry there is not enough count of the book !");
+    require(!userBooks[bookHash][msg.sender], "Sorry the user has already borrowed one copy of the book");
 
     uint nonce = LIBToken.nonces(msg.sender);
-    require( LIBToken.checkPermit(msg.sender, address(this), value, deadline, v,r,s, nonce) == msg.sender, "The permit verification failed !");
+    require( LIBToken.checkPermit(msg.sender, address(this), _value, _deadline, _v,_r,_s, nonce) == msg.sender, "The permit verification failed !");
 
-    LIBToken.permit(msg.sender, address(this), value, deadline, v,r,s);
+    LIBToken.permit(msg.sender, address(this), _value, _deadline, _v,_r,_s);
 		LIBToken.transferFrom(msg.sender, address(this), rent);
 
-    // Update books mapping
-    books[id].count -= 1;
-    books[id].borrowers.push(msg.sender);
+    books[bookHash].count -= 1;
+    books[bookHash].borrowers.push(msg.sender);
 
-    // Update the booksStored array
-    for (uint256 i = 0; i < booksStored.length; i++) {
-        if (keccak256(abi.encodePacked((booksStored[i].id))) == keccak256(abi.encodePacked((id)))) {
-            // Get the storage pointer of the Book
-            Book storage currentBook = booksStored[i];
-            currentBook.count = books[id].count;
-            currentBook.borrowers = books[id].borrowers;
-        }
-    }
-
-    // Add the book to the userBooks mapping
-    userBooks[msg.sender][id] = true;
-    emit BookBorrowed(id);
+    userBooks[bookHash][msg.sender] = true;
+    emit BookBorrowed(_id);
   }
 
   function withdrawLibraryAmount() public onlyOwner {
@@ -169,36 +107,34 @@ contract BookLibrary is Ownable {
       LIBWrapperContract.unwrap(libraryAmount);
   }
 
-  function returnBook(string memory id, uint8 count) public {
-      require(books[id].exists, "The user is trying to return a book which doesn't exist yet !");
-      require(userBooks[msg.sender][id], "The user haven't rented that book !");
+  function returnBook(string memory _id, uint8 count) public {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
 
-      // Update the books mapping
-      books[id].count += count;
+    require(books[bookHash].exists, "The user is trying to return a book which doesn't exist yet !");
+    require(userBooks[bookHash][msg.sender], "The user haven't rented that book !");
 
-      // Update the booksStored array
-      for (uint256 i = 0; i < booksStored.length; i++) {
-          if (keccak256(abi.encodePacked((booksStored[i].id))) == keccak256(abi.encodePacked((id)))) {
-              Book storage currentBook = booksStored[i];
-              currentBook.count = books[id].count;
-          }
-      }
+    books[bookHash].count += count;
+    userBooks[bookHash][msg.sender] = false;
 
-      // Remove the book from the userBooks mapping
-      userBooks[msg.sender][id] = false;
-
-      emit BookReturned(id);
+    emit BookReturned(_id);
   }
 
+  function getBook(string memory _id) public view returns (Book memory) {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
+    require(books[bookHash].exists, "Sorry the book doesn't exists yet !");
+    return books[bookHash];
+  }
   // Flags
-  function isAvailable(string memory id) public view returns (bool) {
-    return books[id].count != 0;
+  function isAvailable(string memory _id) public view returns (bool) {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
+
+    return books[bookHash].count != 0;
   }
 
-  function isRented(string memory id) public view returns (bool) {
-    return userBooks[msg.sender][id];
+  function isRented(string memory _id) public view returns (bool) {
+    bytes32 bookHash = keccak256(abi.encodePacked(_id));
+    return userBooks[bookHash][msg.sender];
   }
-
   // Fallbacks
   receive() external payable {}
 }
